@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matriz de Control de Proyectos - Calidad y Manufactura (Supabase Realtime)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Iconos FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS para lectura de Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Chart.js para las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase Client UMD -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .perspective-container { perspective: 1000px; }
+        .card-3d { transform: rotateX(4deg) rotateY(-4deg); transition: transform 0.5s ease; }
+        .card-3d:hover { transform: rotateX(0deg) rotateY(0deg); }
+    </style>
+</head>
+<body class="bg-slate-100 font-sans text-slate-800">
+
+    <!-- Header Principal -->
+    <header class="bg-slate-900 text-white shadow-md p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-industry"></i> QMS Ingeniería - Control de Proyectos</h1>
+            <p class="text-xs text-slate-400">Conectado a Supabase (En Vivo / Realtime) | Control operativo, NPI, scrap, mejoras y analítica</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div>
+                <label class="text-xs text-slate-300 block font-semibold">Seleccionar Proyecto Activo:</label>
+                <select id="global-model-select" class="bg-slate-800 text-white border border-slate-700 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"></select>
+            </div>
+            <button onclick="exportarDatosJSON()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-sm transition cursor-pointer" title="Exportar respaldo JSON"><i class="fa-solid fa-download"></i> Respaldar</button>
+        </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+
+        <!-- Pestañas de Navegación -->
+        <div class="flex flex-wrap gap-2 border-b border-slate-300 pb-3">
+            <button onclick="cambiarPestana('matriz')" class="tab-btn px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium transition cursor-pointer shadow-sm" data-target="matriz">Matriz General</button>
+            <button onclick="cambiarPestana('npi')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="npi">Proyectos NPI</button>
+            <button onclick="cambiarPestana('prs')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="prs">Status PR´s</button>
+            <button onclick="cambiarPestana('yield_diario')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="yield_diario">Yield Diario</button>
+            <button onclick="cambiarPestana('yield_semanal')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="yield_semanal">Yield Semanal</button>
+            <button onclick="cambiarPestana('tiempo_muerto')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="tiempo_muerto">Tiempo Muerto</button>
+            <button onclick="cambiarPestana('acciones')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="acciones">Acciones</button>
+            <button onclick="cambiarPestana('scrap')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="scrap">Scrap</button>
+            <button onclick="cambiarPestana('mejoras')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="mejoras">Mejoras / Improvements</button>
+            <button onclick="cambiarPestana('mapeo')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="mapeo">Mapeo de Proceso</button>
+            <button onclick="cambiarPestana('enlaces')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="enlaces">Enlaces Externos</button>
+            <button onclick="cambiarPestana('dashboard')" class="tab-btn px-4 py-2 bg-white text-slate-700 hover:bg-slate-200 rounded-lg text-sm font-medium transition cursor-pointer border border-slate-200" data-target="dashboard">Dashboard & Top 5</button>
+        </div>
+
+        <!-- CONTENIDO: MATRIZ GENERAL -->
+        <section id="sec-matriz" class="tab-content py-2 space-y-6 flex flex-col items-center">
+            <div class="perspective-container w-full max-w-3xl my-2">
+                <div class="card-3d bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 text-white p-8 rounded-2xl shadow-xl border border-slate-800 flex flex-col items-center text-center space-y-4">
+                    <div class="bg-blue-600/30 p-4 rounded-xl border border-blue-500/30 text-blue-400 text-2xl shadow-inner">
+                        <i class="fa-solid fa-cube"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-3xl font-extrabold tracking-tight">QMS Ingeniería</h2>
+                        <p class="text-xs text-blue-400 font-medium mt-1">CREATED BY JUAN SEGURA</p>
+                    </div>
+                    <p class="text-xs text-slate-300 max-w-lg">Sistema Integral de Gestión de Calidad, Manufactura y Trazabilidad Operativa para Líneas de Producción y Celdas SMT.</p>
+                    <div class="flex flex-wrap gap-3 pt-2 justify-center">
+                        <button onclick="cambiarPestana('npi')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-rocket"></i> Ver Proyectos NPI</button>
+                        <button onclick="window.scrollTo({top: 400, behavior: 'smooth'})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-4 py-2.5 rounded-lg border border-slate-700 transition flex items-center gap-2 cursor-pointer"><i class="fa-solid fa-list"></i> Listado General</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-circle-plus text-blue-600"></i> Registrar Nuevo Proyecto en Matriz General</h3>
+                <form id="form-nuevo-general" onsubmit="guardarNuevoProyectoGeneral(event)" class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="input-nuevo-general" required placeholder="Nombre del nuevo proyecto/modelo..." class="flex-1 border rounded p-2 text-sm bg-slate-50">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded text-sm transition cursor-pointer">Agregar a Matriz</button>
+                </form>
+            </div>
+            
+            <div id="listado-matriz-general" class="w-full max-w-4xl bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-lg font-bold text-slate-800">Proyectos en Matriz General (Liberados / Producción)</h3>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-matriz-general">0 Proyectos</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3" id="grid-matriz-general"></div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: PROYECTOS NPI -->
+        <section id="sec-npi" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-circle-plus text-purple-600"></i> Registrar Proyecto NPI</h3>
+                <form id="form-nuevo-npi" onsubmit="guardarProyectoNPI(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Modelo / Proyecto</label>
+                        <select id="npi-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área</label>
+                        <input type="text" id="npi-area" required placeholder="Ej. Calidad / SMT" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Revisión</label>
+                        <input type="text" id="npi-revision" required placeholder="Ej. Rev. A" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Acción</label>
+                        <input type="text" id="npi-accion" required placeholder="Acción a realizar..." class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="npi-status" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha de Corrida</label>
+                        <input type="date" id="npi-fechacorrida" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status General / Fase</label>
+                        <input type="text" id="npi-statusgeneral" required placeholder="Ej. Piloto" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3 pt-2">
+                        <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar NPI</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado NPI</h2>
+                    <span class="bg-purple-100 text-purple-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-npi">0 Registros</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="tabla-npi">
+                        <thead>
+                            <tr class="bg-slate-100 border-b text-xs text-slate-600 uppercase">
+                                <th class="p-2.5">Modelo</th>
+                                <th class="p-2.5">Área</th>
+                                <th class="p-2.5">Revisión</th>
+                                <th class="p-2.5">Acción</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Fecha</th>
+                                <th class="p-2.5">Fase</th>
+                                <th class="p-2.5 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: STATUS PR'S -->
+        <section id="sec-prs" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-circle-plus text-indigo-600"></i> Registrar Status PR</h3>
+                <form id="form-prs" onsubmit="guardarRegistroPR(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="pr-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">N/P de PR</label>
+                        <input type="text" id="pr-numpriv" required placeholder="Número de Parte / PR" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área</label>
+                        <input type="text" id="pr-area" required placeholder="Área solicitante" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Tooling</label>
+                        <input type="text" id="pr-tooling" required placeholder="Herramental / Equipo" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Explicación</label>
+                        <input type="text" id="pr-explicacion" required placeholder="Motivo o detalle de la PR" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="pr-status" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="Aprobada">Aprobada</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 pt-2">
+                        <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar Status PR</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado de Status PR´s</h2>
+                    <span class="bg-indigo-100 text-indigo-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-prs">0 Registros</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="tabla-prs">
+                        <thead>
+                            <tr class="bg-slate-100 border-b text-xs text-slate-600 uppercase">
+                                <th class="p-2.5">Modelo</th>
+                                <th class="p-2.5">N/P de PR</th>
+                                <th class="p-2.5">Explicación</th>
+                                <th class="p-2.5">Tooling</th>
+                                <th class="p-2.5">Área</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- PESTAÑAS OPERATIVAS (Yields & Tiempos Muertos) CON FILTROS Y RANGO DE FECHAS -->
+        <section id="sec-operativa" class="tab-content hidden space-y-6">
+            <div class="bg-emerald-50 border border-emerald-200 p-6 rounded-xl shadow-sm space-y-3">
+                <h3 class="text-md font-bold text-emerald-900"><i class="fa-solid fa-file-excel text-emerald-600"></i> Carga Masiva de Excel para <span id="excel-section-title"></span></h3>
+                <div class="flex flex-col sm:flex-row gap-3 items-center">
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="border rounded p-2 text-sm bg-white flex-1 w-full">
+                    <button onclick="importarDatosExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded text-sm whitespace-nowrap cursor-pointer">Cargar Excel</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 id="operativa-titulo" class="text-lg font-bold mb-4">Registro Operativo</h2>
+                <form id="form-operativo" onsubmit="guardarRegistroOperativo(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="op-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha</label>
+                        <input type="date" id="op-fecha" required class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área / Línea</label>
+                        <input type="text" id="op-area" required placeholder="Ej. Línea SMT 1" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Problema / Defecto</label>
+                        <input type="text" id="op-problema" required placeholder="Descripción" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Acción Correctiva</label>
+                        <input type="text" id="op-accion" required placeholder="Acción" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contención</label>
+                        <input type="text" id="op-contencion" required placeholder="Contención" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="op-status" class="w-full border rounded p-2 text-sm">
+                            <option value="Completado">Completado</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Valor Métrico (% Yield, Minutos o Impacto)</label>
+                        <input type="number" step="any" id="op-valor" required value="0" class="w-full border rounded p-2 text-sm">
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded text-sm cursor-pointer">Guardar Registro</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- CONTROLES DE FILTRO Y RANGO DE FECHAS -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Filtrar por Rango (Fecha Inicio)</label>
+                    <input type="date" id="filtro-fecha-inicio" onchange="renderizarVistaOperativaActual()" class="w-full border rounded p-2 text-sm bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Filtrar por Rango (Fecha Fin)</label>
+                    <input type="date" id="filtro-fecha-fin" onchange="renderizarVistaOperativaActual()" class="w-full border rounded p-2 text-sm bg-white">
+                </div>
+                <div class="flex gap-2">
+                    <div class="flex-1">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Búsqueda / Status</label>
+                        <select id="filtro-status-op" onchange="renderizarVistaOperativaActual()" class="w-full border rounded p-2 text-sm bg-white">
+                            <option value="">Todos los Status</option>
+                            <option value="Completado">Completado</option>
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <button onclick="limpiarFiltrosOperativos()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded text-xs font-semibold mt-5 cursor-pointer" title="Limpiar filtros"><i class="fa-solid fa-rotate-right"></i></button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-md">Registros del Proyecto Actual (<span id="span-modelo-activo-label"></span>)</h3>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-operativa-filtrados">0 Registros</span>
+                </div>
+                <table class="w-full text-left border-collapse" id="tabla-operativa">
+                    <thead>
+                        <tr class="bg-slate-100 border-b text-xs text-slate-600 uppercase">
+                            <th class="p-2">Modelo</th><th class="p-2">Fecha</th><th class="p-2">Área</th><th class="p-2">Problema</th><th class="p-2">Acción</th><th class="p-2">Contención</th><th class="p-2">Status</th><th class="p-2">Valor</th><th class="p-2">Eliminar</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center">
+                    <h3 id="grafica-operativa-titulo" class="text-sm font-bold text-slate-700 mb-4 self-start">Tendencia Operativa (Filtrada)</h3>
+                    <div class="w-full h-72 relative"><canvas id="graficaOperativaCanvas"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 self-start">Top 5 Incidencias / Áreas (Filtradas)</h3>
+                    <div class="w-full h-72 relative"><canvas id="graficaOperativaTopCanvas"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: ACCIONES -->
+        <section id="sec-acciones" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-circle-plus text-blue-600"></i> Registrar Nueva Acción</h3>
+                <form id="form-acciones" onsubmit="guardarRegistroAccion(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="acc-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha</label>
+                        <input type="date" id="acc-fecha" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área</label>
+                        <input type="text" id="acc-area" required placeholder="Área / Línea" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Owner (Responsable)</label>
+                        <input type="text" id="acc-owner" required placeholder="Nombre del Owner" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Problema</label>
+                        <input type="text" id="acc-problema" required placeholder="Descripción del problema" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Acción</label>
+                        <input type="text" id="acc-accion" required placeholder="Plan de acción" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contención</label>
+                        <input type="text" id="acc-contencion" required placeholder="Acción de contención" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha de Cierre</label>
+                        <input type="date" id="acc-fechacierre" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="acc-status" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Verificado</label>
+                        <select id="acc-verificado" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Sí">Sí</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Anexar Imagen o Evidencia</label>
+                        <input type="file" id="acc-imagen" accept="image/*" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3 pt-2">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar Acción</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado de Acciones</h2>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-acciones">0 Registros</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse" id="tabla-acciones">
+                        <thead>
+                            <tr class="bg-slate-100 border-b text-xs text-slate-600 uppercase">
+                                <th class="p-2.5">Modelo</th>
+                                <th class="p-2.5">Fecha</th>
+                                <th class="p-2.5">Área</th>
+                                <th class="p-2.5">Owner</th>
+                                <th class="p-2.5">Problema</th>
+                                <th class="p-2.5">Acción</th>
+                                <th class="p-2.5">Contención</th>
+                                <th class="p-2.5">Cierre</th>
+                                <th class="p-2.5">Status</th>
+                                <th class="p-2.5">Verificado</th>
+                                <th class="p-2.5">Evidencia</th>
+                                <th class="p-2.5 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: SCRAP -->
+        <section id="sec-scrap" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-triangle-exclamation text-rose-600"></i> Registrar Scrap</h3>
+                <form id="form-scrap" onsubmit="guardarRegistroScrap(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="scrap-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha</label>
+                        <input type="date" id="scrap-fecha" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área</label>
+                        <input type="text" id="scrap-area" required placeholder="Área / Línea" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Número de Parte</label>
+                        <input type="text" id="scrap-numparte" required placeholder="No. de Parte" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Problema / Defecto</label>
+                        <input type="text" id="scrap-problema" required placeholder="Descripción del defecto" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Costo ($)</label>
+                        <input type="number" step="any" id="scrap-costo" required value="0" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Acción</label>
+                        <input type="text" id="scrap-accion" required placeholder="Acción correctiva" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contención</label>
+                        <input type="text" id="scrap-contencion" required placeholder="Contención aplicada" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fecha de Cierre</label>
+                        <input type="date" id="scrap-fechacierre" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                        <select id="scrap-status" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="En Proceso">En Proceso</option>
+                            <option value="Completado">Completado</option>
+                            <option value="En Revisión">En Revisión</option>
+                            <option value="Delay">Delay</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Verificado</label>
+                        <select id="scrap-verificado" class="w-full border rounded p-2 text-sm bg-slate-50">
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="Sí">Sí</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="md:col-span-3 pt-2">
+                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar Registro de Scrap</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4 overflow-x-auto">
+                    <div class="flex justify-between items-center border-b pb-3">
+                        <h2 class="text-lg font-bold text-slate-800">Listado de Scrap</h2>
+                        <span class="bg-rose-100 text-rose-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-scrap">0 Registros</span>
+                    </div>
+                    <table class="w-full text-left border-collapse" id="tabla-scrap">
+                        <thead>
+                            <tr class="bg-slate-100 border-b text-xs text-slate-600 uppercase">
+                                <th class="p-2">Modelo</th>
+                                <th class="p-2">Fecha</th>
+                                <th class="p-2">Área</th>
+                                <th class="p-2">Parte</th>
+                                <th class="p-2">Problema</th>
+                                <th class="p-2">Costo</th>
+                                <th class="p-2">Acción</th>
+                                <th class="p-2">Cierre</th>
+                                <th class="p-2">Status</th>
+                                <th class="p-2">Verif.</th>
+                                <th class="p-2 text-center">Eliminar</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 self-start">Top 3 Scrap con Mayor Costo</h3>
+                    <div class="w-full h-72 relative"><canvas id="graficaScrapTopCanvas"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: MEJORAS / IMPROVEMENTS -->
+        <section id="sec-mejoras" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-lightbulb text-amber-500"></i> Registrar Mejora / Kaizen (Antes y Después)</h3>
+                <form id="form-mejoras" onsubmit="guardarRegistroMejora(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="mej-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Área</label>
+                        <input type="text" id="mej-area" required placeholder="Área de la mejora" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Título General de la Mejora</label>
+                        <input type="text" id="mej-titulo" required placeholder="Título breve o explicación general" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Descripción del ANTES</label>
+                        <textarea id="mej-desc-antes" required rows="2" placeholder="Explica cómo estaba antes..." class="w-full border rounded p-2 text-sm bg-slate-50"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Descripción del DESPUÉS</label>
+                        <textarea id="mej-desc-despues" required rows="2" placeholder="Explica el resultado o mejora aplicada..." class="w-full border rounded p-2 text-sm bg-slate-50"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Imagen ANTES</label>
+                        <input type="file" id="mej-img-antes" accept="image/*" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Imagen DESPUÉS</label>
+                        <input type="file" id="mej-img-despues" accept="image/*" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2 pt-2">
+                        <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar Mejora</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado de Mejoras (Antes / Después)</h2>
+                    <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-mejoras">0 Registros</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="grid-mejoras"></div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: MAPEO DE PROCESO -->
+        <section id="sec-mapeo" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-sitemap text-teal-600"></i> Registrar Mapeo de Proceso / Diagrama</h3>
+                <form id="form-mapeo" onsubmit="guardarRegistroMapeo(event)" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="map-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre del Proceso</label>
+                        <input type="text" id="map-nombre" required placeholder="Ej. Proceso SMT / Ensamble" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Descripción / Pasos del Proceso</label>
+                        <textarea id="map-descripcion" required rows="2" placeholder="Detalle de las etapas o pasos..." class="w-full border rounded p-2 text-sm bg-slate-50"></textarea>
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Diagrama o Imagen del Mapeo</label>
+                        <input type="file" id="map-imagen" accept="image/*" required class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-2 pt-2">
+                        <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Guardar Mapeo de Proceso</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado de Mapeos de Proceso</h2>
+                    <span class="bg-teal-100 text-teal-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-mapeo">0 Registros</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="grid-mapeo"></div>
+            </div>
+        </section>
+
+        <!-- CONTENIDO: ENLACES EXTERNOS -->
+        <section id="sec-enlaces" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <h3 class="text-md font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-link text-blue-600"></i> Registrar Enlace Externo</h3>
+                <form id="form-enlaces" onsubmit="guardarRegistroEnlace(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Seleccionar Modelo</label>
+                        <select id="link-modelo" required class="w-full border rounded p-2 text-sm bg-slate-50"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Título del Enlace</label>
+                        <input type="text" id="link-titulo" required placeholder="Ej. Documentación SharePoint" class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">URL (Enlace)</label>
+                        <input type="url" id="link-url" required placeholder="https://..." class="w-full border rounded p-2 text-sm bg-slate-50">
+                    </div>
+                    <div class="md:col-span-3 pt-2">
+                        <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded text-sm cursor-pointer">Agregar Enlace</button>
+                    </div>
+                </form>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h2 class="text-lg font-bold text-slate-800">Listado de Enlaces Externos</h2>
+                    <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-3 py-1 rounded-full" id="contador-enlaces">0 Registros</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4" id="grid-enlaces"></div>
+            </div>
+        </section>
+
+        <!-- DASHBOARD -->
+        <section id="sec-dashboard" class="tab-content hidden space-y-6">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold mb-1">Dashboard Analítico y Top 5 - <span id="dash-model-title"></span></h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div class="bg-slate-50 p-4 rounded-lg border flex flex-col items-center">
+                        <h3 class="font-semibold text-sm mb-3 text-slate-700 self-start">Top 5 Tiempos Muertos / Paros</h3>
+                        <div class="w-full h-72 relative"><canvas id="graficaDashboardParos"></canvas></div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg border flex flex-col items-center">
+                        <h3 class="font-semibold text-sm mb-3 text-slate-700 self-start">Top 5 Áreas con Incidencias</h3>
+                        <div class="w-full h-72 relative"><canvas id="graficaDashboardAreas"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Script de Supabase con Realtime WebSockets -->
+    <script>
+        const SUPABASE_URL = "https://ciyekkoyiwsfyfzpubiv.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_rUhceHbVzLKt81HrPzulJw_XrSdhd0z";
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const MODELOS_GENERALES_INICIAL = ["HID", "RIVIAN", "SENSITECH", "ULTRA", "GM", "MARELLI", "BROSE", "SENSATA", "ASSA ABLOY", "TKS", "VALEO", "EMERSON"];
+        const MODELOS_NPI_INICIAL = ["GHOST", "BELIMO", "FORD LS", "TE CONNECTIVITY"];
+
+        let pestañaActual = 'matriz';
+        let modeloActual = MODELOS_GENERALES_INICIAL[0];
+        
+        let chartOperativaInstance = null;
+        let chartOperativaTopInstance = null;
+        let chartScrapTopInstance = null;
+        let chartDashParosInstance = null;
+        let chartDashAreasInstance = null;
+
+        let cacheDB = {
+            generales: MODELOS_GENERALES_INICIAL,
+            npi: MODELOS_NPI_INICIAL,
+            registros: [],
+            registros_npi: [],
+            registros_prs: [],
+            registros_acciones: [],
+            registros_scrap: [],
+            registros_mejoras: [],
+            registros_mapeo: [],
+            registros_enlaces: []
+        };
+
+        async function sincronizarDatosRemotos() {
+            try {
+                let { data: gen, error: errGen } = await supabaseClient.from('generales').select('*');
+                if(errGen) console.error("Error cargando 'generales':", errGen);
+                if (gen && gen.length > 0) cacheDB.generales = gen.map(item => item.nombre);
+
+                let { data: npi, error: errNpi } = await supabaseClient.from('npi').select('*');
+                if(errNpi) console.error("Error cargando 'npi':", errNpi);
+                if (npi && npi.length > 0) cacheDB.npi = npi.map(item => item.nombre);
+
+                let { data: regs, error: errRegs } = await supabaseClient.from('registros').select('*');
+                if(errRegs) console.error("Error cargando 'registros':", errRegs);
+                if (regs) cacheDB.registros = regs;
+
+                let { data: regNpi, error: errRegNpi } = await supabaseClient.from('registros_npi').select('*');
+                if(errRegNpi) console.error("Error cargando 'registros_npi':", errRegNpi);
+                if (regNpi) cacheDB.registros_npi = regNpi;
+
+                let { data: regPrs, error: errRegPrs } = await supabaseClient.from('registros_prs').select('*');
+                if(errRegPrs) console.error("Error cargando 'registros_prs':", errRegPrs);
+                if (regPrs) cacheDB.registros_prs = regPrs;
+
+                let { data: regAcc, error: errRegAcc } = await supabaseClient.from('registros_acciones').select('*');
+                if(errRegAcc) console.error("Error cargando 'registros_acciones':", errRegAcc);
+                if (regAcc) cacheDB.registros_acciones = regAcc;
+
+                let { data: regScrap, error: errRegScrap } = await supabaseClient.from('registros_scrap').select('*');
+                if(errRegScrap) console.error("Error cargando 'registros_scrap':", errRegScrap);
+                if (regScrap) cacheDB.registros_scrap = regScrap;
+
+                let { data: regMej, error: errRegMej } = await supabaseClient.from('registros_mejoras').select('*');
+                if(errRegMej) console.error("Error cargando 'registros_mejoras':", errRegMej);
+                if (regMej) cacheDB.registros_mejoras = regMej;
+
+                let { data: regMap, error: errRegMap } = await supabaseClient.from('registros_mapeo').select('*');
+                if(errRegMap) console.error("Error cargando 'registros_mapeo':", errRegMap);
+                if (regMap) cacheDB.registros_mapeo = regMap;
+
+                let { data: regLink, error: errRegLink } = await supabaseClient.from('registros_enlaces').select('*');
+                if(errRegLink) console.error("Error cargando 'registros_enlaces':", errRegLink);
+                if (regLink) cacheDB.registros_enlaces = regLink;
+
+                actualizarSelectorGlobal();
+                poblarSelectoresFormularios();
+                actualizarVistaActual();
+            } catch (err) {
+                console.error("Error general sincronizando con Supabase:", err);
+            }
+        }
+
+        function configurarRealtimeSupabase() {
+            supabaseClient.channel('db-changes')
+                .on('postgres_changes', { event: '*', schema: 'public' }, payload => {
+                    console.log('Cambio detectado en tiempo real:', payload);
+                    sincronizarDatosRemotos();
+                })
+                .subscribe();
+        }
+
+        function obtenerTodosModelos() { return [...cacheDB.generales, ...cacheDB.npi]; }
+
+        function actualizarSelectorGlobal() {
+            const selectModelos = document.getElementById('global-model-select');
+            if(!selectModelos) return;
+            selectModelos.innerHTML = '';
+            let todos = obtenerTodosModelos();
+            if(!todos.includes(modeloActual) && todos.length > 0) modeloActual = todos[0];
+
+            todos.forEach(m => {
+                let opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                if(m === modeloActual) opt.selected = true;
+                selectModelos.appendChild(opt);
+            });
+        }
+
+        function poblarSelectoresFormularios() {
+            let todos = obtenerTodosModelos();
+            
+            ['npi-modelo', 'pr-modelo', 'op-modelo', 'acc-modelo', 'scrap-modelo', 'mej-modelo', 'map-modelo', 'link-modelo'].forEach(id => {
+                const sel = document.getElementById(id);
+                if (sel) {
+                    let valorPrevio = sel.value;
+                    sel.innerHTML = '';
+                    todos.forEach(m => {
+                        let opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = m;
+                        if(m === valorPrevio || (id !== 'npi-modelo' && m === modeloActual)) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                }
+            });
+        }
+
+        const globalSelect = document.getElementById('global-model-select');
+        if (globalSelect) {
+            globalSelect.addEventListener('change', (e) => {
+                modeloActual = e.target.value;
+                poblarSelectoresFormularios();
+                // Actualiza select de formulario operativo con el modelo global actual
+                const opMod = document.getElementById('op-modelo');
+                if(opMod) opMod.value = modeloActual;
+                actualizarVistaActual();
+            });
+        }
+
+        function cambiarPestana(pestana) {
+            pestañaActual = pestana;
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if(btn.dataset.target === pestana) {
+                    btn.classList.remove('bg-white', 'text-slate-700', 'border');
+                    btn.classList.add('bg-slate-900', 'text-white', 'shadow-sm');
+                } else {
+                    btn.classList.remove('bg-slate-900', 'text-white', 'shadow-sm');
+                    btn.classList.add('bg-white', 'text-slate-700', 'border', 'border-slate-200');
+                }
+            });
+
+            document.querySelectorAll('.tab-content').forEach(sec => sec.classList.add('hidden'));
+
+            if(pestana === 'matriz') {
+                document.getElementById('sec-matriz').classList.remove('hidden');
+                renderizarListadoMatrizGeneral();
+            } else if(pestana === 'npi') {
+                document.getElementById('sec-npi').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                renderizarTablaNPI();
+            } else if(pestana === 'prs') {
+                document.getElementById('sec-prs').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                renderizarTablaPRs();
+            } else if(['yield_diario', 'yield_semanal', 'tiempo_muerto'].includes(pestana)) {
+                document.getElementById('sec-operativa').classList.remove('hidden');
+                configurarSeccionOperativa(pestana);
+            } else if(pestana === 'acciones') {
+                document.getElementById('sec-acciones').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                const accFecha = document.getElementById('acc-fecha');
+                const accCierre = document.getElementById('acc-fechacierre');
+                if(accFecha) accFecha.valueAsDate = new Date();
+                if(accCierre) accCierre.valueAsDate = new Date();
+                renderizarTablaAcciones();
+            } else if(pestana === 'scrap') {
+                document.getElementById('sec-scrap').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                const scrapFecha = document.getElementById('scrap-fecha');
+                const scrapCierre = document.getElementById('scrap-fechacierre');
+                if(scrapFecha) scrapFecha.valueAsDate = new Date();
+                if(scrapCierre) scrapCierre.valueAsDate = new Date();
+                renderizarTablaScrap();
+            } else if(pestana === 'mejoras') {
+                document.getElementById('sec-mejoras').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                renderizarListadoMejoras();
+            } else if(pestana === 'mapeo') {
+                document.getElementById('sec-mapeo').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                renderizarListadoMapeo();
+            } else if(pestana === 'enlaces') {
+                document.getElementById('sec-enlaces').classList.remove('hidden');
+                poblarSelectoresFormularios();
+                renderizarListadoEnlaces();
+            } else if(pestana === 'dashboard') {
+                document.getElementById('sec-dashboard').classList.remove('hidden');
+                renderizarDashboard();
+            }
+        }
+
+        function actualizarVistaActual() { cambiarPestana(pestañaActual); }
+
+        function obtenerBadgeStatus(status) {
+            let clases = "px-2.5 py-1 rounded-full text-xs font-semibold ";
+            if(status === 'Completado' || status === 'Aprobada' || status === 'Sí') clases += "bg-emerald-100 text-emerald-800";
+            else if(status === 'En Proceso') clases += "bg-amber-100 text-amber-800";
+            else if(status === 'En Revisión') clases += "bg-yellow-100 text-yellow-800";
+            else if(status === 'Delay' || status === 'No') clases += "bg-rose-100 text-rose-800";
+            else clases += "bg-slate-100 text-slate-800";
+            return `<span class="${clases}">${status}</span>`;
+        }
+
+        async function guardarNuevoProyectoGeneral(e) {
+            e.preventDefault();
+            const input = document.getElementById('input-nuevo-general');
+            const nuevoNombre = input.value.trim().toUpperCase();
+            if(!nuevoNombre) return;
+
+            const { error } = await supabaseClient.from('generales').insert([{ nombre: nuevoNombre }]);
+            if(error) { alert("Error al guardar: " + error.message); return; }
+            input.value = '';
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarListadoMatrizGeneral() {
+            const grid = document.getElementById('grid-matriz-general');
+            const contador = document.getElementById('contador-matriz-general');
+            if(!grid) return;
+            contador.textContent = `${cacheDB.generales.length} Proyectos`;
+            grid.innerHTML = '';
+            cacheDB.generales.forEach(m => {
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border p-3.5 rounded-lg flex justify-between items-center shadow-xs">
+                        <span class="text-sm font-bold text-slate-700">${m}</span>
+                        <button onclick="modeloActual='${m}'; actualizarSelectorGlobal(); poblarSelectoresFormularios(); cambiarPestana('dashboard');" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-2.5 py-1 rounded transition cursor-pointer">Dashboard</button>
+                    </div>`;
+            });
+        }
+
+        async function guardarProyectoNPI(e) {
+            e.preventDefault();
+            const { error } = await supabaseClient.from('registros_npi').insert([{
+                modelo: document.getElementById('npi-modelo').value,
+                area: document.getElementById('npi-area').value,
+                revision: document.getElementById('npi-revision').value,
+                accion: document.getElementById('npi-accion').value,
+                status: document.getElementById('npi-status').value,
+                fechacorrida: document.getElementById('npi-fechacorrida').value,
+                statusgeneral: document.getElementById('npi-statusgeneral').value
+            }]);
+            if(error) { alert("Error al guardar NPI: " + error.message); return; }
+            e.target.reset();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarTablaNPI() {
+            const tbody = document.querySelector('#tabla-npi tbody');
+            const contador = document.getElementById('contador-npi');
+            if(!tbody) return;
+            contador.textContent = `${cacheDB.registros_npi.length} Registros`;
+            tbody.innerHTML = '';
+            cacheDB.registros_npi.forEach(r => {
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 font-bold">${r.modelo}</td>
+                        <td class="p-2.5 text-xs">${r.area}</td>
+                        <td class="p-2.5 text-xs">${r.revision}</td>
+                        <td class="p-2.5 text-xs">${r.accion}</td>
+                        <td class="p-2.5 text-xs">${obtenerBadgeStatus(r.status)}</td>
+                        <td class="p-2.5 text-xs">${r.fechacorrida}</td>
+                        <td class="p-2.5 text-xs">${r.statusgeneral}</td>
+                        <td class="p-2.5 text-center">
+                            <button onclick="eliminarRegistroNPI(${r.id})" class="text-rose-600 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        async function eliminarRegistroNPI(id) {
+            await supabaseClient.from('registros_npi').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        // STATUS PR'S
+        async function guardarRegistroPR(e) {
+            e.preventDefault();
+            const { error } = await supabaseClient.from('registros_prs').insert([{
+                modelo: document.getElementById('pr-modelo').value,
+                numpriv: document.getElementById('pr-numpriv').value,
+                area: document.getElementById('pr-area').value,
+                tooling: document.getElementById('pr-tooling').value,
+                explicacion: document.getElementById('pr-explicacion').value,
+                status: document.getElementById('pr-status').value
+            }]);
+            if(error) { alert("Error al guardar Status PR: " + error.message); return; }
+            e.target.reset();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarTablaPRs() {
+            let filtrados = cacheDB.registros_prs;
+            const tbody = document.querySelector('#tabla-prs tbody');
+            const contador = document.getElementById('contador-prs');
+            if(!tbody) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            tbody.innerHTML = '';
+            filtrados.forEach(r => {
+                tbody.innerHTML += `
+                    <tr class="border-b hover:bg-slate-50">
+                        <td class="p-2.5 font-bold">${r.modelo || ''}</td>
+                        <td class="p-2.5 font-semibold text-xs">${r.numpriv || r.num_parte || ''}</td>
+                        <td class="p-2.5 text-xs">${r.explicacion || ''}</td>
+                        <td class="p-2.5 text-xs">${r.tooling || ''}</td>
+                        <td class="p-2.5 text-xs">${r.area || ''}</td>
+                        <td class="p-2.5 text-xs">${obtenerBadgeStatus(r.status || 'En Proceso')}</td>
+                        <td class="p-2.5 text-center">
+                            <button onclick="eliminarRegistroPR(${r.id})" class="text-rose-600 cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        async function eliminarRegistroPR(id) {
+            await supabaseClient.from('registros_prs').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        function configurarSeccionOperativa(pestana) {
+            const titulos = { 
+                'yield_diario': 'Yield Diario', 
+                'yield_semanal': 'Yield Semanal', 
+                'tiempo_muerto': 'Tiempo Muerto'
+            };
+            document.getElementById('excel-section-title').textContent = titulos[pestana];
+            document.getElementById('operativa-titulo').textContent = `Gestión de ${titulos[pestana]}`;
+            const opFecha = document.getElementById('op-fecha');
+            if(opFecha) opFecha.valueAsDate = new Date();
+            poblarSelectoresFormularios();
+            
+            // Asignar automáticamente el modelo global activo al formulario de registro operativo
+            const opModeloSel = document.getElementById('op-modelo');
+            if(opModeloSel) opModeloSel.value = modeloActual;
+            
+            document.getElementById('span-modelo-activo-label').textContent = modeloActual;
+            renderizarVistaOperativaActual();
+        }
+
+        async function guardarRegistroOperativo(e) {
+            e.preventDefault();
+            const { error } = await supabaseClient.from('registros').insert([{
+                pestana: pestañaActual,
+                modelo: document.getElementById('op-modelo').value,
+                fecha: document.getElementById('op-fecha').value,
+                area: document.getElementById('op-area').value,
+                problema: document.getElementById('op-problema').value,
+                accion: document.getElementById('op-accion').value,
+                contencion: document.getElementById('op-contencion').value,
+                status: document.getElementById('op-status').value,
+                valor: parseFloat(document.getElementById('op-valor').value) || 0
+            }]);
+            if(error) { alert("Error al guardar operativo: " + error.message); return; }
+            e.target.reset();
+            const opFecha = document.getElementById('op-fecha');
+            if(opFecha) opFecha.valueAsDate = new Date();
+            const opModeloSel = document.getElementById('op-modelo');
+            if(opModeloSel) opModeloSel.value = modeloActual;
+            sincronizarDatosRemotos();
+        }
+
+        function limpiarFiltrosOperativos() {
+            document.getElementById('filtro-fecha-inicio').value = '';
+            document.getElementById('filtro-fecha-fin').value = '';
+            document.getElementById('filtro-status-op').value = '';
+            renderizarVistaOperativaActual();
+        }
+
+        function renderizarVistaOperativaActual() {
+            renderizarTablaOperativa(pestañaActual);
+        }
+
+        function renderizarTablaOperativa(pestana) {
+            // Filtrar inicialmente por la pestaña y por el modelo global seleccionado
+            let filtrados = cacheDB.registros.filter(r => r.pestana === pestana && r.modelo === modeloActual);
+
+            // Aplicar filtros adicionales de UI (Fechas y Status)
+            const fInicio = document.getElementById('filtro-fecha-inicio').value;
+            const fFin = document.getElementById('filtro-fecha-fin').value;
+            const fStatus = document.getElementById('filtro-status-op').value;
+
+            if (fInicio) {
+                filtrados = filtrados.filter(r => r.fecha >= fInicio);
+            }
+            if (fFin) {
+                filtrados = filtrados.filter(r => r.fecha <= fFin);
+            }
+            if (fStatus) {
+                filtrados = filtrados.filter(r => r.status === fStatus);
+            }
+
+            const tbody = document.querySelector('#tabla-operativa tbody');
+            const contadorFiltrados = document.getElementById('contador-operativa-filtrados');
+            if(!tbody) return;
+            if(contadorFiltrados) contadorFiltrados.textContent = `${filtrados.length} Registros`;
+
+            tbody.innerHTML = '';
+            filtrados.forEach(r => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b">
+                        <td class="p-2 text-xs font-bold">${r.modelo}</td>
+                        <td class="p-2 text-xs">${r.fecha}</td>
+                        <td class="p-2 text-xs">${r.area}</td>
+                        <td class="p-2 text-xs">${r.problema}</td>
+                        <td class="p-2 text-xs">${r.accion}</td>
+                        <td class="p-2 text-xs">${r.contencion}</td>
+                        <td class="p-2 text-xs">${obtenerBadgeStatus(r.status)}</td>
+                        <td class="p-2 text-xs font-bold">${r.valor}</td>
+                        <td class="p-2 text-xs"><button onclick="eliminarRegistroOperativo(${r.id})" class="text-rose-600 cursor-pointer"><i class="fa-solid fa-trash"></i></button></td>
+                    </tr>`;
+            });
+            renderizarGraficaOperativa(pestana, filtrados);
+            renderizarGraficaOperativaTop(filtrados);
+        }
+
+        async function eliminarRegistroOperativo(id) {
+            await supabaseClient.from('registros').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarGraficaOperativa(pestana, filtrados) {
+            const canvas = document.getElementById('graficaOperativaCanvas');
+            if(!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (chartOperativaInstance) chartOperativaInstance.destroy();
+            chartOperativaInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: filtrados.map(f => `${f.area} (${f.fecha})`),
+                    datasets: [{
+                        label: 'Valor Métrico',
+                        data: filtrados.map(f => f.valor),
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function renderizarGraficaOperativaTop(filtrados) {
+            const canvas = document.getElementById('graficaOperativaTopCanvas');
+            if(!canvas) return;
+            let topData = [...filtrados].sort((a,b) => b.valor - a.valor).slice(0, 5);
+            const ctx = canvas.getContext('2d');
+            if (chartOperativaTopInstance) chartOperativaTopInstance.destroy();
+            chartOperativaTopInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topData.length > 0 ? topData.map(d => `${d.area} - ${d.problema}`) : ['Sin datos'],
+                    datasets: [{
+                        label: 'Top 5 Valores',
+                        data: topData.length > 0 ? topData.map(d => d.valor) : [0],
+                        backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // ACCIONES
+        async function guardarRegistroAccion(e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('acc-imagen');
+            let imagenUrl = 'N/A';
+            if (fileInput.files.length > 0) {
+                const toBase64 = file => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                });
+                imagenUrl = await toBase64(fileInput.files[0]);
+            }
+
+            const { error } = await supabaseClient.from('registros_acciones').insert([{
+                modelo: document.getElementById('acc-modelo').value,
+                fecha: document.getElementById('acc-fecha').value,
+                area: document.getElementById('acc-area').value,
+                owner: document.getElementById('acc-owner').value,
+                problema: document.getElementById('acc-problema').value,
+                accion: document.getElementById('acc-accion').value,
+                contencion: document.getElementById('acc-contencion').value,
+                fechacierre: document.getElementById('acc-fechacierre').value,
+                status: document.getElementById('acc-status').value,
+                verificado: document.getElementById('acc-verificado').value,
+                imagen: imagenUrl
+            }]);
+            if(error) { alert("Error al guardar acción: " + error.message); return; }
+            e.target.reset();
+            const accFecha = document.getElementById('acc-fecha');
+            const accCierre = document.getElementById('acc-fechacierre');
+            if(accFecha) accFecha.valueAsDate = new Date();
+            if(accCierre) accCierre.valueAsDate = new Date();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarTablaAcciones() {
+            let filtrados = cacheDB.registros_acciones;
+            const tbody = document.querySelector('#tabla-acciones tbody');
+            const contador = document.getElementById('contador-acciones');
+            if(!tbody) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            tbody.innerHTML = '';
+            filtrados.forEach(r => {
+                let evidenciaHTML = 'Sin archivo';
+                if(r.imagen && r.imagen !== 'N/A') {
+                    if(r.imagen.startsWith('data:image')) {
+                        evidenciaHTML = `<a href="${r.imagen}" target="_blank"><img src="${r.imagen}" class="w-10 h-10 object-cover rounded border" /></a>`;
+                    } else {
+                        evidenciaHTML = `<i class="fa-solid fa-image text-blue-600" title="${r.imagen}"></i>`;
+                    }
+                }
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b">
+                        <td class="p-2.5 text-xs font-bold">${r.modelo}</td>
+                        <td class="p-2.5 text-xs">${r.fecha}</td>
+                        <td class="p-2.5 text-xs">${r.area}</td>
+                        <td class="p-2.5 text-xs font-semibold">${r.owner}</td>
+                        <td class="p-2.5 text-xs">${r.problema}</td>
+                        <td class="p-2.5 text-xs">${r.accion}</td>
+                        <td class="p-2.5 text-xs">${r.contencion}</td>
+                        <td class="p-2.5 text-xs">${r.fechacierre}</td>
+                        <td class="p-2.5 text-xs">${obtenerBadgeStatus(r.status)}</td>
+                        <td class="p-2.5 text-xs">${obtenerBadgeStatus(r.verificado)}</td>
+                        <td class="p-2.5 text-xs">${evidenciaHTML}</td>
+                        <td class="p-2.5 text-xs text-center"><button onclick="eliminarRegistroAccion(${r.id})" class="text-rose-600 cursor-pointer"><i class="fa-solid fa-trash"></i></button></td>
+                    </tr>`;
+            });
+        }
+
+        async function eliminarRegistroAccion(id) {
+            await supabaseClient.from('registros_acciones').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        // SCRAP
+        async function guardarRegistroScrap(e) {
+            e.preventDefault();
+            const { error } = await supabaseClient.from('registros_scrap').insert([{
+                modelo: document.getElementById('scrap-modelo').value,
+                fecha: document.getElementById('scrap-fecha').value,
+                area: document.getElementById('scrap-area').value,
+                numparte: document.getElementById('scrap-numparte').value,
+                problema: document.getElementById('scrap-problema').value,
+                costo: parseFloat(document.getElementById('scrap-costo').value) || 0,
+                accion: document.getElementById('scrap-accion').value,
+                contencion: document.getElementById('scrap-contencion').value,
+                fechacierre: document.getElementById('scrap-fechacierre').value,
+                status: document.getElementById('scrap-status').value,
+                verificado: document.getElementById('scrap-verificado').value
+            }]);
+            if(error) { alert("Error al guardar scrap: " + error.message); return; }
+            e.target.reset();
+            const scrapFecha = document.getElementById('scrap-fecha');
+            const scrapCierre = document.getElementById('scrap-fechacierre');
+            if(scrapFecha) scrapFecha.valueAsDate = new Date();
+            if(scrapCierre) scrapCierre.valueAsDate = new Date();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarTablaScrap() {
+            let filtrados = cacheDB.registros_scrap;
+            const tbody = document.querySelector('#tabla-scrap tbody');
+            const contador = document.getElementById('contador-scrap');
+            if(!tbody) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            tbody.innerHTML = '';
+            filtrados.forEach(r => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 border-b">
+                        <td class="p-2 text-xs font-bold">${r.modelo}</td>
+                        <td class="p-2 text-xs">${r.fecha}</td>
+                        <td class="p-2 text-xs">${r.area}</td>
+                        <td class="p-2 text-xs font-bold">${r.numparte}</td>
+                        <td class="p-2 text-xs">${r.problema}</td>
+                        <td class="p-2 text-xs font-bold text-rose-600">$${r.costo.toFixed(2)}</td>
+                        <td class="p-2 text-xs">${r.accion}</td>
+                        <td class="p-2 text-xs">${r.fechacierre}</td>
+                        <td class="p-2 text-xs">${obtenerBadgeStatus(r.status)}</td>
+                        <td class="p-2 text-xs">${obtenerBadgeStatus(r.verificado)}</td>
+                        <td class="p-2 text-xs text-center"><button onclick="eliminarRegistroScrap(${r.id})" class="text-rose-600 cursor-pointer"><i class="fa-solid fa-trash"></i></button></td>
+                    </tr>`;
+            });
+            renderizarGraficaScrapTop(filtrados);
+        }
+
+        async function eliminarRegistroScrap(id) {
+            await supabaseClient.from('registros_scrap').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarGraficaScrapTop(filtrados) {
+            const canvas = document.getElementById('graficaScrapTopCanvas');
+            if(!canvas) return;
+            let topData = [...filtrados].sort((a,b) => b.costo - a.costo).slice(0, 3);
+            const ctx = canvas.getContext('2d');
+            if (chartScrapTopInstance) chartScrapTopInstance.destroy();
+            chartScrapTopInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topData.length > 0 ? topData.map(d => `${d.modelo} - ${d.numparte}`) : ['Sin datos'],
+                    datasets: [{
+                        label: 'Costo ($)',
+                        data: topData.length > 0 ? topData.map(d => d.costo) : [0],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        // MEJORAS / IMPROVEMENTS
+        async function guardarRegistroMejora(e) {
+            e.preventDefault();
+            const imgAntesInput = document.getElementById('mej-img-antes').files[0];
+            const imgDespuesInput = document.getElementById('mej-img-despues').files[0];
+
+            const toBase64 = file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+
+            const imgantes = imgAntesInput ? await toBase64(imgAntesInput) : '';
+            const imgdespues = imgDespuesInput ? await toBase64(imgDespuesInput) : '';
+
+            const { error } = await supabaseClient.from('registros_mejoras').insert([{
+                modelo: document.getElementById('mej-modelo').value,
+                area: document.getElementById('mej-area').value,
+                titulo: document.getElementById('mej-titulo').value,
+                descantes: document.getElementById('mej-desc-antes').value,
+                descdespues: document.getElementById('mej-desc-despues').value,
+                imgantes: imgantes,
+                imgdespues: imgdespues
+            }]);
+            if(error) { alert("Error al guardar mejora: " + error.message); return; }
+            e.target.reset();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarListadoMejoras() {
+            let filtrados = cacheDB.registros_mejoras;
+            const grid = document.getElementById('grid-mejoras');
+            const contador = document.getElementById('contador-mejoras');
+            if(!grid) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            grid.innerHTML = '';
+            filtrados.forEach(r => {
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border p-4 rounded-xl shadow-xs space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-slate-800">[${r.modelo}] ${r.titulo}</span>
+                            <span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">${r.area}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="bg-white p-3 rounded border space-y-2">
+                                <span class="text-xs font-bold text-slate-500 block">ANTES:</span>
+                                <p class="text-xs text-slate-700">${r.descantes || 'Sin descripción'}</p>
+                                ${r.imgantes ? `<img src="${r.imgantes}" class="w-full h-36 object-cover rounded border" />` : '<div class="h-36 bg-slate-200 rounded flex items-center justify-center text-xs text-slate-500">Sin imagen</div>'}
+                            </div>
+                            <div class="bg-white p-3 rounded border space-y-2">
+                                <span class="text-xs font-bold text-emerald-600 block">DESPUÉS:</span>
+                                <p class="text-xs text-slate-700">${r.descdespues || 'Sin descripción'}</p>
+                                ${r.imgdespues ? `<img src="${r.imgdespues}" class="w-full h-36 object-cover rounded border" />` : '<div class="h-36 bg-slate-200 rounded flex items-center justify-center text-xs text-slate-500">Sin imagen</div>'}
+                            </div>
+                        </div>
+                        <div class="text-right pt-1">
+                            <button onclick="eliminarRegistroMejora(${r.id})" class="text-xs text-rose-600 cursor-pointer font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function eliminarRegistroMejora(id) {
+            await supabaseClient.from('registros_mejoras').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        // MAPEO DE PROCESO
+        async function guardarRegistroMapeo(e) {
+            e.preventDefault();
+            const imgInput = document.getElementById('map-imagen').files[0];
+            const toBase64 = file => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+            const imagen = imgInput ? await toBase64(imgInput) : '';
+
+            const { error } = await supabaseClient.from('registros_mapeo').insert([{
+                modelo: document.getElementById('map-modelo').value,
+                nombre: document.getElementById('map-nombre').value,
+                descripcion: document.getElementById('map-descripcion').value,
+                imagen: imagen
+            }]);
+            if(error) { alert("Error al guardar mapeo: " + error.message); return; }
+            e.target.reset();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarListadoMapeo() {
+            let filtrados = cacheDB.registros_mapeo;
+            const grid = document.getElementById('grid-mapeo');
+            const contador = document.getElementById('contador-mapeo');
+            if(!grid) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            grid.innerHTML = '';
+            filtrados.forEach(r => {
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border p-4 rounded-xl shadow-xs space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-slate-800">[${r.modelo}] ${r.nombre}</span>
+                            <button onclick="eliminarRegistroMapeo(${r.id})" class="text-xs text-rose-600 cursor-pointer font-semibold"><i class="fa-solid fa-trash"></i> Eliminar</button>
+                        </div>
+                        <p class="text-xs text-slate-600">${r.descripcion}</p>
+                        <div class="bg-white p-2 rounded border">
+                            <span class="text-xs font-bold text-teal-700 block mb-1">Diagrama del Proceso:</span>
+                            ${r.imagen ? `<img src="${r.imagen}" class="w-full h-48 object-contain rounded border bg-slate-900" />` : '<div class="h-48 bg-slate-200 rounded flex items-center justify-center text-xs text-slate-500">Sin diagrama</div>'}
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function eliminarRegistroMapeo(id) {
+            await supabaseClient.from('registros_mapeo').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        // ENLACES EXTERNOS
+        async function guardarRegistroEnlace(e) {
+            e.preventDefault();
+            const { error } = await supabaseClient.from('registros_enlaces').insert([{
+                modelo: document.getElementById('link-modelo').value,
+                titulo: document.getElementById('link-titulo').value,
+                url: document.getElementById('link-url').value
+            }]);
+            if(error) { alert("Error al guardar enlace: " + error.message); return; }
+            e.target.reset();
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarListadoEnlaces() {
+            let filtrados = cacheDB.registros_enlaces;
+            const grid = document.getElementById('grid-enlaces');
+            const contador = document.getElementById('contador-enlaces');
+            if(!grid) return;
+            contador.textContent = `${filtrados.length} Registros`;
+            grid.innerHTML = '';
+            filtrados.forEach(r => {
+                grid.innerHTML += `
+                    <div class="bg-slate-50 border p-4 rounded-xl shadow-xs flex flex-col justify-between space-y-3">
+                        <div>
+                            <span class="text-xs font-bold text-blue-600 block">[${r.modelo}]</span>
+                            <h4 class="text-sm font-bold text-slate-800">${r.titulo}</h4>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t">
+                            <a href="${r.url}" target="_blank" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition"><i class="fa-solid fa-external-link-alt mr-1"></i> Abrir Enlace</a>
+                            <button onclick="eliminarRegistroEnlace(${r.id})" class="text-rose-600 text-xs cursor-pointer"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function eliminarRegistroEnlace(id) {
+            await supabaseClient.from('registros_enlaces').delete().eq('id', id);
+            sincronizarDatosRemotos();
+        }
+
+        function renderizarDashboard() {
+            const titleEl = document.getElementById('dash-model-title');
+            if(titleEl) titleEl.textContent = modeloActual;
+            let paros = cacheDB.registros.filter(r => r.pestana === 'tiempo_muerto' && r.modelo === modeloActual);
+            
+            const canvas1 = document.getElementById('graficaDashboardParos');
+            if (canvas1) {
+                const ctx1 = canvas1.getContext('2d');
+                if (chartDashParosInstance) chartDashParosInstance.destroy();
+                chartDashParosInstance = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: paros.length > 0 ? paros.map(p => p.area) : ['Sin datos'],
+                        datasets: [{ label: 'Minutos', data: paros.length > 0 ? paros.map(p => p.valor) : [0], backgroundColor: '#3b82f6' }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+
+            let areasMap = {};
+            cacheDB.registros.filter(r => r.modelo === modeloActual).forEach(r => {
+                areasMap[r.area] = (areasMap[r.area] || 0) + 1;
+            });
+            let topAreas = Object.entries(areasMap).sort((a,b) => b[1] - a[1]).slice(0, 5);
+
+            const canvas2 = document.getElementById('graficaDashboardAreas');
+            if (canvas2) {
+                const ctx2 = canvas2.getContext('2d');
+                if (chartDashAreasInstance) chartDashAreasInstance.destroy();
+                chartDashAreasInstance = new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: topAreas.length > 0 ? topAreas.map(a => a[0]) : ['Sin datos'],
+                        datasets: [{ data: topAreas.length > 0 ? topAreas.map(a => a[1]) : [1], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'] }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false }
+                });
+            }
+        }
+
+        function exportarDatosJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(cacheDB, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `respaldo_qms_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        async function importarDatosExcel() {
+            const fileInput = document.getElementById('excel-file-input');
+            if (!fileInput.files.length) {
+                alert("Por favor selecciona un archivo Excel primero.");
+                return;
+            }
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+                    for (let row of rows) {
+                        const { error } = await supabaseClient.from('registros').insert([{
+                            pestana: pestañaActual,
+                            modelo: row.Modelo || modeloActual,
+                            fecha: row.Fecha ? new Date(row.Fecha).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                            area: row.Area || row.Área || 'General',
+                            problema: row.Problema || row.Defecto || 'No especificado',
+                            accion: row.Accion || row.Acción || 'N/A',
+                            contencion: row.Contencion || row.Contención || 'N/A',
+                            status: row.Status || 'En Proceso',
+                            valor: parseFloat(row.Valor || row.Yield || row.Minutos || 0)
+                        }]);
+                        if(error) console.error("Error importando fila de Excel:", error);
+                    }
+                    alert("¡Importación masiva completada exitosamente!");
+                    fileInput.value = '';
+                    sincronizarDatosRemotos();
+                } catch (err) {
+                    console.error("Error al procesar el archivo Excel:", err);
+                    alert("Ocurrió un error al procesar el archivo. Revisa el formato de las columnas.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            sincronizarDatosRemotos();
+            configurarRealtimeSupabase();
+        });
+    </script>
+</body>
+</html>
